@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "start:origin": "vite serve --open ./index.origin.html",
+    "start:basic": "vite serve --open ./index.basic.html",
     "start:refactoring": "vite serve --open ./index.refactoring.html",
     "test": "vitest",
     "test:origin": "vitest src/origin",
