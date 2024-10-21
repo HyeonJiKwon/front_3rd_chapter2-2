@@ -1,5 +1,6 @@
-import { CartItem, Coupon, Product } from '../../types.ts';
-import { useCart } from "../hooks";
+import { Coupon, Product } from '../../types.ts';
+import { useCart } from "../hooks/cart/index.ts";
+import { getMaxApplicableDiscount } from '../hooks/utils/cartUtils.ts';
 
 interface Props {
   products: Product[];
@@ -12,6 +13,7 @@ export const CartPage = ({ products, coupons }: Props) => {
     addToCart,
     removeFromCart,
     updateQuantity,
+    getRemainingStock,
     applyCoupon,
     calculateTotal,
     selectedCoupon
@@ -21,24 +23,7 @@ export const CartPage = ({ products, coupons }: Props) => {
     return discounts.reduce((max, discount) => Math.max(max, discount.rate), 0);
   };
 
-  const getRemainingStock = (product: Product) => {
-    const cartItem = cart.find(item => item.product.id === product.id);
-    return product.stock - (cartItem?.quantity || 0);
-  };
-
   const { totalBeforeDiscount, totalAfterDiscount, totalDiscount } = calculateTotal()
-
-  const getAppliedDiscount = (item: CartItem) => {
-    const { discounts } = item.product;
-    const { quantity } = item;
-    let appliedDiscount = 0;
-    for (const discount of discounts) {
-      if (quantity >= discount.quantity) {
-        appliedDiscount = Math.max(appliedDiscount, discount.rate);
-      }
-    }
-    return appliedDiscount;
-  };
 
   return (
     <div className="container mx-auto p-4">
@@ -95,7 +80,7 @@ export const CartPage = ({ products, coupons }: Props) => {
 
           <div className="space-y-2">
             {cart.map(item => {
-              const appliedDiscount = getAppliedDiscount(item);
+              const appliedDiscount = getMaxApplicableDiscount(item);
               return (
                 <div key={item.product.id} className="flex justify-between items-center bg-white p-3 rounded shadow">
                   <div>
