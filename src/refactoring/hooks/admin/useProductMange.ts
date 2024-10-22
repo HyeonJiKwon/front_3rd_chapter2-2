@@ -8,7 +8,7 @@ export const useProductManage = (
   editingProduct:Product | null,
   setEditingProduct: (product: Product | null) => void,
 ) => {
-  // const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+
   const [newProduct, setNewProduct] = useState<Omit<Product, 'id'>>({
     name: '',
     price: 0,
@@ -52,7 +52,6 @@ export const useProductManage = (
   };
 
   return {
-    // editingProduct,
     newProduct,
     showNewProductForm,
     setShowNewProductForm,

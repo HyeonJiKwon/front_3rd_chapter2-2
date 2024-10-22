@@ -20,7 +20,6 @@ export const useDiscount = (
   };
 
   const handleRemoveDiscount = (productId: string, index: number) => {
-    console.log(productId,index)
     const productToUpdate = products.find(p => p.id === productId);
     if (productToUpdate) {
       const updatedProduct = removeDiscountFromProduct(productToUpdate, index);

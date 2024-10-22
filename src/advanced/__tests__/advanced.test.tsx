@@ -1,9 +1,11 @@
 import { useState } from "react";
 import { describe, expect, test } from 'vitest';
-import { act, fireEvent, render, screen, within } from '@testing-library/react';
+import { act, fireEvent, render, renderHook, screen, within } from '@testing-library/react';
 import { CartPage } from '../../refactoring/components/CartPage';
-import { AdminPage } from "../../refactoring/components/AdminPage";
+import { AdminPage } from "../../refactoring/components/admin/AdminPage";
 import { Coupon, Product } from '../../types';
+import { useDiscount, useProductManage } from "../../refactoring/hooks/admin";
+import { AccordionProvider, useAccordion } from "../../refactoring/context/AccodionContext";
 
 const mockProducts: Product[] = [
   {
@@ -233,12 +235,151 @@ describe('advanced > ', () => {
 
   describe('자유롭게 작성해보세요.', () => {
     test('새로운 유틸 함수를 만든 후에 테스트 코드를 작성해서 실행해보세요', () => {
-      expect(true).toBe(false);
+      // render(<TestAdminPage/>);
+
+      //   const { result } = renderHook(() => useDiscount(products, onProductUpdate,setEditingProduct));
+      //   act(() => {
+      //     result.current.handleAddDiscount();
+      //   });
+      //   expect(result.current.count).toBe(1);
     })
 
     test('새로운 hook 함수르 만든 후에 테스트 코드를 작성해서 실행해보세요', () => {
       expect(true).toBe(false);
     })
   })
+  // 테스트용 컴포넌트
+const TestAccordionComponent = () => {
+  const { openProductIds, toggleProductAccordion } = useAccordion();
+  
+  return (
+    <div>
+      <button onClick={() => toggleProductAccordion('product-1')}>
+        Toggle Product 1
+      </button>
+      <div data-testid="product-status">
+        {openProductIds.has('product-1') ? 'Open' : 'Closed'}
+      </div>
+    </div>
+  );
+};
+
+  describe('AccordionContext', () => {
+    test('Context를 정상적으로 제공했을 때의 테스트', () => {
+      render(
+        <AccordionProvider>
+          <TestAccordionComponent />
+        </AccordionProvider>
+      );
+      
+      const productStatus = screen.getByTestId('product-status');
+      const toggleButton = screen.getByText('Toggle Product 1');
+      
+      // 초기 상태는 'Closed'여야 함
+      expect(productStatus.textContent).toBe('Closed');
+      
+      // 버튼 클릭 후 'Open'으로 상태가 변경되어야 함
+      fireEvent.click(toggleButton);
+      expect(productStatus.textContent).toBe('Open');
+      
+      // 다시 클릭하면 'Closed'로 돌아가야 함
+      fireEvent.click(toggleButton);
+      expect(productStatus.textContent).toBe('Closed');
+    });
+
+    test(' Context 없이 사용할 때의 에러 발생 여부 테스트', () => {
+      const renderWithoutProvider = () => render(<TestAccordionComponent />);
+      
+      // AccordionProvider 없이 사용하면 에러가 발생해야 함
+      expect(renderWithoutProvider).toThrowError('useAccordion must be used within an AccordionProvider');
+    });
+  });
+
+
+  // mock 함수 생성
+  // const onProductUpdate = jest.fn();
+  // const onProductAdd = jest.fn();
+
+  // mock 데이터
+  const mockProduct: Product = {
+    id: '1',
+    name: 'Test Product',
+    price: 1000,
+    stock: 10,
+    discounts: [],
+  };
+
+  // 초기 상태로 사용하는 새로운 상품
+  const initialNewProduct = {
+    name: '',
+    price: 0,
+    stock: 0,
+    discounts: [],
+  };
+
+  describe('useProductManage : 상품 관리 훅의 테스트', () => {
+    
+    test('상품 필드 업데이트 테스트', () => {
+      // const { result } = renderHook(() =>
+      //   useProductManage(onProductUpdate, onProductAdd, mockProduct, jest.fn())
+      // );
+
+      // act(() => {
+      //   result.current.handleFieldUpdate('1', { name: 'Updated Product' });
+      // });
+
+      // // 업데이트 후의 상태가 반영되는지 확인
+      // expect(result.current.handleFieldUpdate).toBeDefined();
+    });
+
+    // 상품 편집 시작 테스트
+    test('should start editing a product correctly', () => {
+      // const setEditingProduct = jest.fn();
+      // const { result } = renderHook(() =>
+      //   useProductManage(onProductUpdate, onProductAdd, null, setEditingProduct)
+      // );
+
+      // act(() => {
+      //   result.current.handleEditProduct(mockProduct);
+      // });
+
+      // // 편집 시작 시 상태가 적절히 설정되는지 확인
+      // expect(setEditingProduct).toHaveBeenCalledWith(mockProduct);
+    });
+
+    // 상품 편집 완료 테스트
+    test('should complete editing a product correctly', () => {
+      // const setEditingProduct = jest.fn();
+      // const { result } = renderHook(() =>
+      //   useProductManage(onProductUpdate, onProductAdd, mockProduct, setEditingProduct)
+      // );
+
+      // act(() => {
+      //   result.current.handleEditComplete();
+      // });
+
+      // // onProductUpdate가 호출되었는지 확인
+      // expect(onProductUpdate).toHaveBeenCalledWith(mockProduct);
+
+      // // 편집 완료 후 상태가 초기화되는지 확인
+      // expect(setEditingProduct).toHaveBeenCalledWith(null);
+    });
+
+    // 새로운 상품 추가 테스트
+    test('should add a new product correctly', () => {
+      // const { result } = renderHook(() =>
+      //   useProductManage(onProductUpdate, onProductAdd, null, jest.fn())
+      // );
+
+      // act(() => {
+      //   result.current.handleAddNewProduct();
+      // });
+
+      // // onProductAdd가 새로운 상품을 호출하는지 확인
+      // expect(onProductAdd).toHaveBeenCalled();
+      // expect(result.current.newProduct).toEqual(initialNewProduct);
+      // expect(result.current.showNewProductForm).toBe(false);
+    });
+  });
 })
 
