@@ -1,12 +1,12 @@
 import { useState } from "react";
-import { describe, expect, test, vi } from 'vitest';
+import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { act, fireEvent, render, renderHook, screen, within } from '@testing-library/react';
 import { CartPage } from '../../refactoring/components/CartPage';
 import { AdminPage } from "../../refactoring/components/admin/AdminPage";
-import { Coupon, Product } from '../../types';
-import { useDiscount, useProductAdd,useProductEdit } from "../../refactoring/hooks/admin";
+import { Coupon, Discount, Product } from '../../types';
+import { useCoupon, useDiscount, useProductAdd,useProductEdit } from "../../refactoring/hooks/admin";
 import { AccordionProvider, useAccordion } from "../../refactoring/context/AccodionContext";
-import { addDiscountToProduct, createNewProduct, removeDiscountFromProduct, updateProductFields } from "../../refactoring/hooks/utils/adminUtils";
+import { addDiscountToProduct, createNewProduct, getProductToUpdate, removeDiscountFromProduct, updateProductFields } from "../../refactoring/hooks/utils/adminUtils";
 
 const mockProducts: Product[] = [
   {
@@ -249,21 +249,22 @@ describe('advanced > ', () => {
       expect($newCoupon).toHaveTextContent('새 쿠폰 (NEW10):10% 할인');
     })
   })
-  describe('커스텀 훅 & context 테스트', () => {
-    const TestAccordionComponent = () => {
-      const { openProductIds, toggleProductAccordion } = useAccordion();
-      
-      return (
-        <div>
-          <button onClick={() => toggleProductAccordion('product-1')}>
-            Toggle Product 1
-          </button>
-          <div data-testid="product-status">
-            {openProductIds.has('product-1') ? 'Open' : 'Closed'}
+  describe('관리자 페이지 기능 테스트 ', () => {
+    describe('커스텀 훅 & context 테스트', () => {
+      const TestAccordionComponent = () => {
+        const { openProductIds, toggleProductAccordion } = useAccordion();
+        
+        return (
+          <div>
+            <button onClick={() => toggleProductAccordion('product-1')}>
+              Toggle Product 1
+            </button>
+            <div data-testid="product-status">
+              {openProductIds.has('product-1') ? 'Open' : 'Closed'}
+            </div>
           </div>
-        </div>
-      );
-    };
+        );
+      };
 
       describe('AccordionContext', () => {
         test('Context를 정상적으로 제공했을 때의 테스트', () => {
@@ -299,7 +300,6 @@ describe('advanced > ', () => {
       // mock 함수 생성
       const onProductUpdate = vi.fn();
       const onProductAdd = vi.fn();
-      // const setEditingProduct = vi.fn();
 
     
       const DEFAULT_PRODUCT = {
@@ -383,11 +383,98 @@ describe('advanced > ', () => {
           expect(setShowNewProductForm).toHaveBeenCalledWith(false);
         });
       });
+
+      describe('useDiscount : 상품의 할인 관리 훅의 테스트', () => {
+        beforeEach(() => {
+          vi.clearAllMocks(); // 테스트 실행 전에 mock 함수 초기화
+        });
+        const setEditingProduct = vi.fn();
+        const newDiscount: Discount = { quantity: 3, rate: 0.1 };
+        const DEFAULT_DISCOUNT: Discount = { quantity: 0, rate: 0 };
+
+        const { result } = renderHook(() =>
+          useDiscount(mockProducts,onProductUpdate, setEditingProduct)
+        );
+
+        test('각 상품의 할인 정보 추가 시 상품 정보가 업데이트 되는지 확인', () => {
+          const { result } = renderHook(() =>
+            useDiscount(mockProducts,onProductUpdate, setEditingProduct)
+          );
+
+          act(() => {
+            result.current.setNewDiscount(newDiscount); // 새로운 할인 설정
+          });
+
+          expect(result.current.newDiscount).toEqual(newDiscount); // 추가된 할인 정보 확인
+
+          act(() => {
+            result.current.handleAddDiscount('p1'); // 상품 할인 추가 함수 호출
+          });
+          // onProductUpdate 및 setEditingProduct가 호출되었는지 확인
+          expect(onProductUpdate).toHaveBeenCalledTimes(1);
+          expect(setEditingProduct).toHaveBeenCalledTimes(1);
+
+          // onProductUpdate가 호출된 인자 값이 업데이트된 상품인지 확인
+          const updatedProduct = onProductUpdate.mock.calls[0][0];
+          expect(updatedProduct.discounts).toContainEqual(newDiscount); // 추가된 할인 정보 확인
+          expect(result.current.newDiscount).toEqual(DEFAULT_DISCOUNT);
+
+        });
+
+        test('각 상품의 할인 정보 삭제 시 상품 정보가 업데이트 되는지 확인', () => {
+          // 할인 정보 삭제
+          act(() => {
+            result.current.handleRemoveDiscount('p1', 0); // p1에서 첫 번째 할인 삭제
+          });
+
+          expect(onProductUpdate).toHaveBeenCalledTimes(1);
+          expect(setEditingProduct).toHaveBeenCalledTimes(1);
+
+          // 할인 정보가 삭제된 상태로 업데이트되었는지 확인
+          const updatedProduct = onProductUpdate.mock.calls[0][0];
+          expect(updatedProduct.discounts).toEqual([]); // 할인이 없는지 확인
+        });
+      })
+
+      describe('useCoupon : 쿠폰 관리 훅의 테스트', () => {
+        const onCouponAdd = vi.fn();
+        const newCoupon: Coupon = {
+          name: '새로운 쿠폰1',
+          code: '0309',
+          discountType: 'amount',
+          discountValue: 3
+        };
+        const DEFAULT_COUPON: Coupon = {
+          name: '',
+          code: '',
+          discountType: 'percentage',
+          discountValue: 0
+        };
+
+        const { result } = renderHook(() =>
+          useCoupon(onCouponAdd)
+        );
+
+        test('쿠폰이 추가되는지 확인', () => {
+          act(() => {
+            result.current.setNewCoupon(newCoupon); 
+          });
+
+          expect(result.current.newCoupon).toEqual(DEFAULT_COUPON);
+          
+          act(() => {
+            result.current.handleAddCoupon();
+          });
+          expect(onCouponAdd).toHaveBeenCalledTimes(1);
+          expect(result.current.newCoupon).toEqual(DEFAULT_COUPON);
+
+        });
+      });
     })
 
 
     describe('utils 함수 테스트', () => {
-      describe('상품 업데이트 updateProductFields 함수가 정상 작동하는지 확인', () => {
+      describe('상품 업데이트 함수(updateProductFields)가 정상 작동하는지 확인', () => {
         test('name 변경확인',()=>{
           const updateName = 'updateName';
           const updatedProduct = updateProductFields(mockProduct, { name: updateName });
@@ -410,15 +497,13 @@ describe('advanced > ', () => {
 
       });
       
-      describe('상품에 할인 추가 함수 addDiscountToProduct 함수가 정상 작동하는지 확인', () => {
-        test('discounts 변경확인',()=>{
-          const newDiscount = { quantity: 10, rate: 0.1 };
-          const updatedProduct = addDiscountToProduct(mockProduct, newDiscount);
-          expect(updatedProduct.discounts).toContainEqual(newDiscount);
-        })
+      test('상품에 할인 정보 추가 함수(addDiscountToProduct)가 정상 작동하는지 확인', () => {
+        const newDiscount = { quantity: 10, rate: 0.1 };
+        const updatedProduct = addDiscountToProduct(mockProduct, newDiscount);
+        expect(updatedProduct.discounts).toContainEqual(newDiscount);
       });
 
-      test('상품에서 할인 제거 함수 removeDiscountFromProduct 함수가 정상 작동하는지 확인', () => {
+      test('상품에서 할인 제거 함수(removeDiscountFromProduct)가 정상 작동하는지 확인', () => {
          // 인덱스 1의 할인 제거
         const updatedProduct = removeDiscountFromProduct(mockProduct, 1);
 
@@ -427,7 +512,7 @@ describe('advanced > ', () => {
         expect(updatedProduct.discounts).toEqual([{ quantity: 30, rate: 0.3 }]); // 인덱스 0만 남아 있어야 함
       });
 
-      test('새 상품 생성 함수 createNewProduct 함수가 정상 작동하는지 확인', () => {
+      test('새 상품 생성 함수(createNewProduct)가 정상 작동하는지 확인', () => {
          // Date.now()를 mock 처리하여 고정된 id 생성
         const mockDate = 1630000000000; // 고정된 날짜 값을 설정
         vi.spyOn(Date, 'now').mockReturnValue(mockDate);
@@ -439,11 +524,21 @@ describe('advanced > ', () => {
         expect(newProduct.id).toBe(mockDate.toString());
         expect(newProduct).toEqual({ ...mockNewProduct, id: mockDate.toString() });
       });
+
+      describe('특정 상품 찾기 함수(getProductToUpdate)가 정상 작동하는지 확인', () => {
+        test('상품이 존재할 경우', () => {
+          const findProduct = getProductToUpdate(mockProducts, 'p1');
+          
+          expect(findProduct).not.toBeUndefined(); // 상품이 존재하는지 확인
+          expect(findProduct?.id).toEqual('p1');   // 상품의 id가 맞는지 확인
+        });
+      
+        // 상품을 찾지 못하는 경우
+        test('찾는 상품이 없는 경우', () => {
+          const findProduct = getProductToUpdate(mockProducts, 'p10'); // 존재하지 않는 상품 ID
+          expect(findProduct).toBeUndefined(); // undefined 반환 여부 확인
+        });
+      });
     })
   })
-
-    // test('새로운 hook 함수르 만든 후에 테스트 코드를 작성해서 실행해보세요', () => {
-    //   expect(true).toBe(false);
-    // })
-    
-  // 테스트용 컴포넌트
+})

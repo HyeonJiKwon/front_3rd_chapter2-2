@@ -25,3 +25,11 @@ export const removeDiscountFromProduct = (product: Product, index: number): Prod
 export const createNewProduct = (newProductData: Omit<Product, 'id'>): Product => {
   return { ...newProductData, id: Date.now().toString() };
 };
+
+// 업데이트 할 상품 찾기
+export const getProductToUpdate = (
+  products: Product[],
+  productId: string
+): Product | undefined => {
+  return products.find(p => p.id === productId);
+};
