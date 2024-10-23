@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useDiscount, useProductManage } from "../../hooks/admin";
+import  {useDiscount, useProductAdd, useProductEdit} from "../../hooks/admin";
 import { Product } from "../../../types";
 import { ProductProps } from "./types";
 import { useAccordion } from '../../context/AccodionContext';
@@ -7,16 +7,20 @@ import { useAccordion } from '../../context/AccodionContext';
 export const AdminProduct = ({ products, onProductUpdate, onProductAdd }: ProductProps) =>{
   const { openProductIds, toggleProductAccordion } = useAccordion();
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [showNewProductForm, setShowNewProductForm] = useState(false);
+
   const {
     newProduct,
-    showNewProductForm,
-    setShowNewProductForm,
     setNewProduct,
+    handleAddNewProduct,
+  } = useProductAdd(onProductAdd,setShowNewProductForm);
+  
+  const {
     handleFieldUpdate,
     handleEditProduct,
     handleEditComplete,
-    handleAddNewProduct,
-  } = useProductManage(onProductUpdate, onProductAdd,editingProduct,setEditingProduct);
+  } = useProductEdit(onProductUpdate,editingProduct,setEditingProduct);
+  
   const { newDiscount, setNewDiscount, handleAddDiscount, handleRemoveDiscount } = useDiscount(products, onProductUpdate,setEditingProduct);
 
   return (

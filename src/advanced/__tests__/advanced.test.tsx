@@ -1,11 +1,12 @@
 import { useState } from "react";
-import { describe, expect, test } from 'vitest';
+import { describe, expect, test, vi } from 'vitest';
 import { act, fireEvent, render, renderHook, screen, within } from '@testing-library/react';
 import { CartPage } from '../../refactoring/components/CartPage';
 import { AdminPage } from "../../refactoring/components/admin/AdminPage";
 import { Coupon, Product } from '../../types';
-import { useDiscount, useProductManage } from "../../refactoring/hooks/admin";
+import { useDiscount, useProductAdd,useProductEdit } from "../../refactoring/hooks/admin";
 import { AccordionProvider, useAccordion } from "../../refactoring/context/AccodionContext";
+import { addDiscountToProduct, createNewProduct, removeDiscountFromProduct, updateProductFields } from "../../refactoring/hooks/utils/adminUtils";
 
 const mockProducts: Product[] = [
   {
@@ -30,6 +31,22 @@ const mockProducts: Product[] = [
     discounts: [{ quantity: 10, rate: 0.2 }]
   }
 ];
+// mock 데이터
+const mockProduct: Product = {
+  id: '1',
+  name: 'Test Product',
+  price: 1000,
+  stock: 10,
+  discounts: [{ quantity: 30, rate: 0.3 },{ quantity: 10, rate: 0.2 }],
+};
+// mock new 상품데이터
+const mockNewProduct = {
+  name: 'New Product',
+  price: 100,
+  stock: 5,
+  discounts: [{ quantity: 30, rate: 0.3 }]
+};
+
 const mockCoupons: Coupon[] = [
   {
     name: '5000원 할인 쿠폰',
@@ -232,154 +249,201 @@ describe('advanced > ', () => {
       expect($newCoupon).toHaveTextContent('새 쿠폰 (NEW10):10% 할인');
     })
   })
+  describe('커스텀 훅 & context 테스트', () => {
+    const TestAccordionComponent = () => {
+      const { openProductIds, toggleProductAccordion } = useAccordion();
+      
+      return (
+        <div>
+          <button onClick={() => toggleProductAccordion('product-1')}>
+            Toggle Product 1
+          </button>
+          <div data-testid="product-status">
+            {openProductIds.has('product-1') ? 'Open' : 'Closed'}
+          </div>
+        </div>
+      );
+    };
 
-  describe('자유롭게 작성해보세요.', () => {
-    test('새로운 유틸 함수를 만든 후에 테스트 코드를 작성해서 실행해보세요', () => {
-      // render(<TestAdminPage/>);
+      describe('AccordionContext', () => {
+        test('Context를 정상적으로 제공했을 때의 테스트', () => {
+          render(
+            <AccordionProvider>
+              <TestAccordionComponent />
+            </AccordionProvider>
+          );
+          
+          const productStatus = screen.getByTestId('product-status');
+          const toggleButton = screen.getByText('Toggle Product 1');
+          
+          // 초기 상태는 'Closed'여야 함
+          expect(productStatus.textContent).toBe('Closed');
+          
+          // 버튼 클릭 후 'Open'으로 상태가 변경되어야 함
+          fireEvent.click(toggleButton);
+          expect(productStatus.textContent).toBe('Open');
+          
+          // 다시 클릭하면 'Closed'로 돌아가야 함
+          fireEvent.click(toggleButton);
+          expect(productStatus.textContent).toBe('Closed');
+        });
 
-      //   const { result } = renderHook(() => useDiscount(products, onProductUpdate,setEditingProduct));
-      //   act(() => {
-      //     result.current.handleAddDiscount();
-      //   });
-      //   expect(result.current.count).toBe(1);
+        test('Context 없이 사용할 때의 에러 발생 여부 테스트', () => {
+          const renderWithoutProvider = () => render(<TestAccordionComponent />);
+          // AccordionProvider 없이 사용하면 에러가 발생해야 함
+          expect(renderWithoutProvider).toThrowError('useAccordion must be used within an AccordionProvider');
+        });
+      });
+
+
+      // mock 함수 생성
+      const onProductUpdate = vi.fn();
+      const onProductAdd = vi.fn();
+      // const setEditingProduct = vi.fn();
+
+    
+      const DEFAULT_PRODUCT = {
+        name: '',
+        price: 0,
+        stock: 0,
+        discounts: []
+      };
+
+      describe('useProductEdit : 상품 편집 훅의 테스트', () => {
+        // 실제 상태 변화가 일어나는 setEditingProduct 구현
+        let editingProduct = mockProduct as Product | null;
+        const setEditingProduct = (product: Product | null) => {
+          editingProduct = product;
+        };
+        const { result } = renderHook(() =>
+          useProductEdit(onProductUpdate, editingProduct, setEditingProduct)
+        );
+
+          test('상품이 실제로 수정되었는지 확인', () => {
+          act(() => {
+            result.current.handleFieldUpdate('1', { name: 'Updated Product' });
+          });
+
+          // 상태가 실제로 수정되었는지 확인
+          expect(editingProduct).toEqual({
+            ...mockProduct,
+            name: 'Updated Product'
+          });
+        });
+
+        test('상품이 null로 초기화되었는지 확인', () => {
+          act(() => {
+            result.current.handleEditComplete();
+          });
+
+          // 상태가 null로 초기화되었는지 확인
+          expect(editingProduct).toBeNull();
+        });
+      });
+
+      describe('useProductAdd : 상품 추가 훅의 테스트', () => {
+        const setShowNewProductForm = vi.fn()
+        const { result } = renderHook(() =>
+          useProductAdd(onProductAdd, setShowNewProductForm)
+        );
+
+        test('상품 추가 필드가 열렸을 때, 상품이 초기화 되어있는지 확인', () => {
+
+          expect(result.current.newProduct).toEqual(DEFAULT_PRODUCT);
+
+        });
+
+        test('상품이 실제로 추가 되었는지 확인', () => {
+          //상태 업데이트는 비동기적으로 일어나므로, 한 번 렌더링 후 다시 상태를 확인
+          const { result } = renderHook(() =>
+            useProductAdd(onProductAdd, setShowNewProductForm)
+          );
+
+          // act로 상품 정보를 설정 후 상품 추가 함수 호출
+          act(() => {
+            result.current.setNewProduct(mockNewProduct); // 상품 정보 설정
+          });
+
+          // 상태가 변경되었는지 확인
+          expect(result.current.newProduct).toEqual(mockNewProduct); // 상태가 업데이트 되었는지 확인
+
+          // 상품 추가 실행
+          act(() => {
+            result.current.handleAddNewProduct(); // 상품 추가 함수 호출
+          });
+
+          // onProductAdd가 호출되었는지 확인
+          expect(onProductAdd).toHaveBeenCalledTimes(1);
+          expect(onProductAdd.mock.calls[0][0]).toMatchObject(mockNewProduct);
+
+          // 상품 추가 후 newProduct가 DEFAULT_PRODUCT로 초기화되었는지 확인
+          expect(result.current.newProduct).toEqual(DEFAULT_PRODUCT);
+
+          // 상품 추가 후 폼이 닫혔는지 확인
+          expect(setShowNewProductForm).toHaveBeenCalledWith(false);
+        });
+      });
     })
 
-    test('새로운 hook 함수르 만든 후에 테스트 코드를 작성해서 실행해보세요', () => {
-      expect(true).toBe(false);
+
+    describe('utils 함수 테스트', () => {
+      describe('상품 업데이트 updateProductFields 함수가 정상 작동하는지 확인', () => {
+        test('name 변경확인',()=>{
+          const updateName = 'updateName';
+          const updatedProduct = updateProductFields(mockProduct, { name: updateName });
+          expect(updatedProduct.name).toEqual(updateName);
+        })
+        
+        test('price 변경확인',()=>{
+          const updatePrice = 15000;
+          // 1000 -> 15000
+          const updatedProduct = updateProductFields(mockProduct, { price: updatePrice });
+          expect(updatedProduct.price).toEqual(updatePrice);
+        })
+
+        test('stock 변경확인',()=>{
+          const updateStock = 100;
+          // 10-> 100
+          const updatedProduct = updateProductFields(mockProduct, { stock: updateStock });
+          expect(updatedProduct.stock).toEqual(updateStock);
+        })
+
+      });
+      
+      describe('상품에 할인 추가 함수 addDiscountToProduct 함수가 정상 작동하는지 확인', () => {
+        test('discounts 변경확인',()=>{
+          const newDiscount = { quantity: 10, rate: 0.1 };
+          const updatedProduct = addDiscountToProduct(mockProduct, newDiscount);
+          expect(updatedProduct.discounts).toContainEqual(newDiscount);
+        })
+      });
+
+      test('상품에서 할인 제거 함수 removeDiscountFromProduct 함수가 정상 작동하는지 확인', () => {
+         // 인덱스 1의 할인 제거
+        const updatedProduct = removeDiscountFromProduct(mockProduct, 1);
+
+        // 새로운 discounts 배열에 할인 항목이 제거되었는지 확인
+        expect(updatedProduct.discounts).toHaveLength(1);
+        expect(updatedProduct.discounts).toEqual([{ quantity: 30, rate: 0.3 }]); // 인덱스 0만 남아 있어야 함
+      });
+
+      test('새 상품 생성 함수 createNewProduct 함수가 정상 작동하는지 확인', () => {
+         // Date.now()를 mock 처리하여 고정된 id 생성
+        const mockDate = 1630000000000; // 고정된 날짜 값을 설정
+        vi.spyOn(Date, 'now').mockReturnValue(mockDate);
+
+        // createNewProduct 함수 실행
+        const newProduct = createNewProduct(mockNewProduct);
+
+        // 새로운 상품에 id가 제대로 추가되었는지 확인
+        expect(newProduct.id).toBe(mockDate.toString());
+        expect(newProduct).toEqual({ ...mockNewProduct, id: mockDate.toString() });
+      });
     })
   })
-  // 테스트용 컴포넌트
-const TestAccordionComponent = () => {
-  const { openProductIds, toggleProductAccordion } = useAccordion();
-  
-  return (
-    <div>
-      <button onClick={() => toggleProductAccordion('product-1')}>
-        Toggle Product 1
-      </button>
-      <div data-testid="product-status">
-        {openProductIds.has('product-1') ? 'Open' : 'Closed'}
-      </div>
-    </div>
-  );
-};
 
-  describe('AccordionContext', () => {
-    test('Context를 정상적으로 제공했을 때의 테스트', () => {
-      render(
-        <AccordionProvider>
-          <TestAccordionComponent />
-        </AccordionProvider>
-      );
-      
-      const productStatus = screen.getByTestId('product-status');
-      const toggleButton = screen.getByText('Toggle Product 1');
-      
-      // 초기 상태는 'Closed'여야 함
-      expect(productStatus.textContent).toBe('Closed');
-      
-      // 버튼 클릭 후 'Open'으로 상태가 변경되어야 함
-      fireEvent.click(toggleButton);
-      expect(productStatus.textContent).toBe('Open');
-      
-      // 다시 클릭하면 'Closed'로 돌아가야 함
-      fireEvent.click(toggleButton);
-      expect(productStatus.textContent).toBe('Closed');
-    });
-
-    test(' Context 없이 사용할 때의 에러 발생 여부 테스트', () => {
-      const renderWithoutProvider = () => render(<TestAccordionComponent />);
-      
-      // AccordionProvider 없이 사용하면 에러가 발생해야 함
-      expect(renderWithoutProvider).toThrowError('useAccordion must be used within an AccordionProvider');
-    });
-  });
-
-
-  // mock 함수 생성
-  // const onProductUpdate = jest.fn();
-  // const onProductAdd = jest.fn();
-
-  // mock 데이터
-  const mockProduct: Product = {
-    id: '1',
-    name: 'Test Product',
-    price: 1000,
-    stock: 10,
-    discounts: [],
-  };
-
-  // 초기 상태로 사용하는 새로운 상품
-  const initialNewProduct = {
-    name: '',
-    price: 0,
-    stock: 0,
-    discounts: [],
-  };
-
-  describe('useProductManage : 상품 관리 훅의 테스트', () => {
+    // test('새로운 hook 함수르 만든 후에 테스트 코드를 작성해서 실행해보세요', () => {
+    //   expect(true).toBe(false);
+    // })
     
-    test('상품 필드 업데이트 테스트', () => {
-      // const { result } = renderHook(() =>
-      //   useProductManage(onProductUpdate, onProductAdd, mockProduct, jest.fn())
-      // );
-
-      // act(() => {
-      //   result.current.handleFieldUpdate('1', { name: 'Updated Product' });
-      // });
-
-      // // 업데이트 후의 상태가 반영되는지 확인
-      // expect(result.current.handleFieldUpdate).toBeDefined();
-    });
-
-    // 상품 편집 시작 테스트
-    test('should start editing a product correctly', () => {
-      // const setEditingProduct = jest.fn();
-      // const { result } = renderHook(() =>
-      //   useProductManage(onProductUpdate, onProductAdd, null, setEditingProduct)
-      // );
-
-      // act(() => {
-      //   result.current.handleEditProduct(mockProduct);
-      // });
-
-      // // 편집 시작 시 상태가 적절히 설정되는지 확인
-      // expect(setEditingProduct).toHaveBeenCalledWith(mockProduct);
-    });
-
-    // 상품 편집 완료 테스트
-    test('should complete editing a product correctly', () => {
-      // const setEditingProduct = jest.fn();
-      // const { result } = renderHook(() =>
-      //   useProductManage(onProductUpdate, onProductAdd, mockProduct, setEditingProduct)
-      // );
-
-      // act(() => {
-      //   result.current.handleEditComplete();
-      // });
-
-      // // onProductUpdate가 호출되었는지 확인
-      // expect(onProductUpdate).toHaveBeenCalledWith(mockProduct);
-
-      // // 편집 완료 후 상태가 초기화되는지 확인
-      // expect(setEditingProduct).toHaveBeenCalledWith(null);
-    });
-
-    // 새로운 상품 추가 테스트
-    test('should add a new product correctly', () => {
-      // const { result } = renderHook(() =>
-      //   useProductManage(onProductUpdate, onProductAdd, null, jest.fn())
-      // );
-
-      // act(() => {
-      //   result.current.handleAddNewProduct();
-      // });
-
-      // // onProductAdd가 새로운 상품을 호출하는지 확인
-      // expect(onProductAdd).toHaveBeenCalled();
-      // expect(result.current.newProduct).toEqual(initialNewProduct);
-      // expect(result.current.showNewProductForm).toBe(false);
-    });
-  });
-})
-
+  // 테스트용 컴포넌트

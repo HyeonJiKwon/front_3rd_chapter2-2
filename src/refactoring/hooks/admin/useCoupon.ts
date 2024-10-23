@@ -1,19 +1,19 @@
 import { useState } from 'react';
 import { Coupon } from '../../../types';
 
-const DefalutCoupon:Coupon = {
+const DEFAULT_COUPON: Coupon = {
   name: '',
   code: '',
   discountType: 'percentage',
   discountValue: 0
-}
+};
 
-export const useCoupon = (onCouponAdd: (coupon: Coupon) => void) => {
-  const [newCoupon, setNewCoupon] = useState<Coupon>(DefalutCoupon);
+export default function useCoupon(onCouponAdd: (coupon: Coupon) => void) {
+  const [newCoupon, setNewCoupon] = useState<Coupon>(DEFAULT_COUPON);
 
   const handleAddCoupon = () => {
     onCouponAdd(newCoupon);
-    setNewCoupon(DefalutCoupon);
+    setNewCoupon(DEFAULT_COUPON);
   };
 
   return {

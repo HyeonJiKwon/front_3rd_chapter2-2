@@ -1,5 +1,5 @@
 import { CouponProps } from "./types";
-import { useCoupon } from "../../hooks/admin/useCoupon";
+import useCoupon from "../../hooks/admin/useCoupon";
 
 export const AdminCoupon =({ coupons, onCouponAdd }: CouponProps) =>{
   const {newCoupon, setNewCoupon, handleAddCoupon} = useCoupon(onCouponAdd);

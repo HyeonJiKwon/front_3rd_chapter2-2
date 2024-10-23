@@ -2,11 +2,11 @@ import { useState } from 'react';
 import { Product, Discount } from '../../../types';
 import { addDiscountToProduct, removeDiscountFromProduct } from '../utils/adminUtils';
 
-export const useDiscount = (
+export default function useDiscount(
   products: Product[],
   onProductUpdate: (product: Product) => void,
   setEditingProduct: (product: Product) => void
-) => {
+) {
   const [newDiscount, setNewDiscount] = useState<Discount>({ quantity: 0, rate: 0 });
 
   const handleAddDiscount = (productId: string) => {

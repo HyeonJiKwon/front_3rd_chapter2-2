@@ -1,21 +1,11 @@
-import { useState } from 'react';
 import { Product } from '../../../types';
-import { updateProductFields, createNewProduct } from '../utils/adminUtils';
+import { updateProductFields } from '../utils/adminUtils';
 
-export const useProductManage = (
+export default function useProductEdit(
   onProductUpdate: (updatedProduct: Product) => void,
-  onProductAdd: (newProduct: Product) => void,
   editingProduct:Product | null,
   setEditingProduct: (product: Product | null) => void,
-) => {
-
-  const [newProduct, setNewProduct] = useState<Omit<Product, 'id'>>({
-    name: '',
-    price: 0,
-    stock: 0,
-    discounts: [],
-  });
-  const [showNewProductForm, setShowNewProductForm] = useState(false);
+) {
 
   // 공통 상품 필드 업데이트
   const handleFieldUpdate = (productId: string, fields: Partial<Product>) => {
@@ -38,27 +28,9 @@ export const useProductManage = (
     }
   };
 
-  // 새로운 상품 추가
-  const handleAddNewProduct = () => {
-    const newProductWithId = createNewProduct(newProduct);
-    onProductAdd(newProductWithId);
-    setNewProduct({
-      name: '',
-      price: 0,
-      stock: 0,
-      discounts: [],
-    });
-    setShowNewProductForm(false);
-  };
-
   return {
-    newProduct,
-    showNewProductForm,
-    setShowNewProductForm,
-    setNewProduct,
     handleFieldUpdate,
     handleEditProduct,
     handleEditComplete,
-    handleAddNewProduct,
   };
 };
